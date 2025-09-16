@@ -2,61 +2,30 @@ pipeline {
     agent any
 
     environment {
-        EMAIL_RECIPIENTS = 'lasyasrilasya14@gmail.com'
-        GITHUB_TOKEN = credentials('github-token')   // Jenkins Credential ID for GitHub PAT
-        REPO = 'LasyaSriG/nodeJS'                   // Format: user/repo
-        BASE_BRANCH = 'develop'
+        REPO         = "https://github.com/LasyaSriG/nodeJS"      // Replace with your repo
+        BASE_BRANCH  = "develop"
+        GITHUB_TOKEN = credentials('github-token') // Jenkins secret
     }
 
     stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
 
-        stage('Create Pull Request (Immediate)') {
+        stage('Create PR: Feature → Develop') {
             when {
-                expression { env.BRANCH_NAME != 'develop' && env.BRANCH_NAME != 'main' }
+                expression { 
+                    return env.BRANCH_NAME != 'develop' && env.BRANCH_NAME != 'main'
+                }
             }
             steps {
                 withEnv(["GITHUB_TOKEN=${GITHUB_TOKEN}"]) {
                     sh """
-                        echo "🔀 Creating PR from ${env.BRANCH_NAME} → ${BASE_BRANCH}"
-                        # If PR already exists, this will fail silently (you can add logic to skip)
+                        echo "🔀 Creating PR from ${env.BRANCH_NAME} → develop"
                         gh pr create \
                           --repo ${REPO} \
-                          --base ${BASE_BRANCH} \
+                          --base develop \
                           --head ${env.BRANCH_NAME} \
-                          --title "Auto PR: ${env.BRANCH_NAME} → ${BASE_BRANCH}" \
-                          --body "This PR was auto-created by Jenkins as soon as the commit was pushed." || true
-
-                        echo "✅ Marking PR for auto-merge (GitHub will merge when checks pass)"
-                        gh pr merge \
-                          --repo ${REPO} \
-                          --merge \
-                          --auto \
-                          --subject "Auto-merge: ${env.BRANCH_NAME} → ${BASE_BRANCH}" || true
+                          --title "Auto PR: ${env.BRANCH_NAME} → develop" \
+                          --body "This PR was auto-created by Jenkins." || true
                     """
-                }
-            }
-        }
-
-        stage('Install Dependencies') {
-            steps {
-                cache(path: 'node_modules', key: "npm-${env.BRANCH_NAME}") {
-                    sh 'npm install'
-                }
-            }
-        }
-
-        stage('Run Tests') {
-            parallel {
-                stage('Unit Tests') {
-                    steps { sh 'npm run test:unit || npm test' }
-                }
-                stage('Integration Tests') {
-                    steps { sh 'npm run test:integration || echo "No integration tests"' }
                 }
             }
         }
@@ -66,11 +35,7 @@ pipeline {
                 branch 'develop'
             }
             steps {
-                script {
-                    timeout(time: 1, unit: 'HOURS') {
-                        input message: "Do you want to merge *develop → main*?", ok: "Approve Merge"
-                    }
-                }
+                input message: "Approve merge from develop → main?", ok: "Merge"
             }
         }
 
@@ -81,60 +46,35 @@ pipeline {
             steps {
                 withEnv(["GITHUB_TOKEN=${GITHUB_TOKEN}"]) {
                     sh """
-                        echo "🔀 Creating PR from develop → main"
+                        echo "✅ Merging develop → main"
                         gh pr create \
                           --repo ${REPO} \
                           --base main \
                           --head develop \
-                          --title "Release: develop → main" \
-                          --body "This PR promotes develop to main after approval." || true
+                          --title "Auto PR: develop → main" \
+                          --body "This PR was auto-created by Jenkins after approval." || true
 
-                        echo "✅ Marking PR for auto-merge into main"
                         gh pr merge \
                           --repo ${REPO} \
                           --merge \
                           --auto \
-                          --subject "Release auto-merge: develop → main" || true
+                          --subject "Auto-merge: develop → main" || true
                     """
                 }
+            }
+        }
+
+        stage('No Action on Main') {
+            when {
+                branch 'main'
+            }
+            steps {
+                echo "ℹ️ On main branch → no PR created (only receives merges)."
             }
         }
     }
 
     post {
-        success {
-            mail to: "${EMAIL_RECIPIENTS}",
-                 subject: "✅ SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                 body: """
-Hello Team,
-
-Pipeline succeeded for branch '${env.BRANCH_NAME}'.
-Build: #${env.BUILD_NUMBER}
-Logs: ${env.BUILD_URL}
-
-- Feature branch: PR created → develop (auto-merge pending checks)
-- Develop branch: PR created → main (merge pending approval)
-
-Regards,  
-Jenkins
-"""
-        }
-        failure {
-            mail to: "${EMAIL_RECIPIENTS}",
-                 subject: "❌ FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                 body: """
-Hello Team,
-
-Pipeline failed for branch '${env.BRANCH_NAME}'.
-Build: #${env.BUILD_NUMBER}
-Logs: ${env.BUILD_URL}
-
-Please check and fix.
-
-Regards,  
-Jenkins
-"""
-        }
         always {
             cleanWs()
         }
