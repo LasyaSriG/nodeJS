@@ -23,7 +23,6 @@ pipeline {
                 withEnv(["GITHUB_TOKEN=${GITHUB_TOKEN}"]) {
                     sh """
                         echo "🔀 Creating PR from ${env.BRANCH_NAME} → ${BASE_BRANCH}"
-                        # If PR already exists, this will fail silently (you can add logic to skip)
                         gh pr create \
                           --repo ${REPO} \
                           --base ${BASE_BRANCH} \
@@ -31,7 +30,7 @@ pipeline {
                           --title "Auto PR: ${env.BRANCH_NAME} → ${BASE_BRANCH}" \
                           --body "This PR was auto-created by Jenkins as soon as the commit was pushed." || true
 
-                        echo "✅ Marking PR for auto-merge (GitHub will merge when checks pass)"
+                        echo "✅ Marking PR for auto-merge"
                         gh pr merge \
                           --repo ${REPO} \
                           --merge \
@@ -44,9 +43,7 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                cache(path: 'node_modules', key: "npm-${env.BRANCH_NAME}") {
-                    sh 'npm install'
-                }
+                sh 'npm install'
             }
         }
 
@@ -140,3 +137,4 @@ Jenkins
         }
     }
 }
+ 
