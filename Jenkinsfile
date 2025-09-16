@@ -8,7 +8,7 @@ pipeline {
 
     stages {
 
-        stage('Create PR: Feature → Develop') {
+        stage('PR + Merge: Feature → Develop') {
             when {
                 expression {
                     return env.BRANCH_NAME != 'develop' && env.BRANCH_NAME != 'main'
@@ -16,16 +16,22 @@ pipeline {
             }
             steps {
                 withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
-                    sh """
-                        echo "$GITHUB_TOKEN" | gh auth login --with-token
-                        echo "🔀 Creating PR from ${env.BRANCH_NAME} → develop"
+                    sh '''
+                        echo "🔀 Creating PR from ${BRANCH_NAME} → develop"
                         gh pr create \
                           --repo ${REPO} \
                           --base develop \
-                          --head ${env.BRANCH_NAME} \
-                          --title "Auto PR: ${env.BRANCH_NAME} → develop" \
+                          --head ${BRANCH_NAME} \
+                          --title "Auto PR: ${BRANCH_NAME} → develop" \
                           --body "This PR was auto-created by Jenkins." || true
-                    """
+
+                        echo "✅ Merging ${BRANCH_NAME} → develop"
+                        gh pr merge \
+                          --repo ${REPO} \
+                          --merge \
+                          --auto \
+                          --subject "Auto-merge: ${BRANCH_NAME} → develop" || true
+                    '''
                 }
             }
         }
@@ -39,15 +45,14 @@ pipeline {
             }
         }
 
-        stage('Merge Develop → Main') {
+        stage('PR + Merge: Develop → Main') {
             when {
                 branch 'develop'
             }
             steps {
                 withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
-                    sh """
-                        echo "$GITHUB_TOKEN" | gh auth login --with-token
-                        echo "✅ Merging develop → main"
+                    sh '''
+                        echo "🔀 Creating PR from develop → main"
                         gh pr create \
                           --repo ${REPO} \
                           --base main \
@@ -55,12 +60,13 @@ pipeline {
                           --title "Auto PR: develop → main" \
                           --body "This PR was auto-created by Jenkins after approval." || true
 
+                        echo "✅ Merging develop → main"
                         gh pr merge \
                           --repo ${REPO} \
                           --merge \
                           --auto \
                           --subject "Auto-merge: develop → main" || true
-                    """
+                    '''
                 }
             }
         }
@@ -81,4 +87,3 @@ pipeline {
         }
     }
 }
- 
