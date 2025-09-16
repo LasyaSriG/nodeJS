@@ -2,22 +2,22 @@ pipeline {
     agent any
 
     environment {
-        REPO         = "https://github.com/LasyaSriG/nodeJS"      // Replace with your repo
-        BASE_BRANCH  = "develop"
-        GITHUB_TOKEN = credentials('github-token') // Jenkins secret
+        REPO        = "https://github.com/LasyaSriG/nodeJS" // Your repo
+        BASE_BRANCH = "develop"
     }
 
     stages {
 
         stage('Create PR: Feature → Develop') {
             when {
-                expression { 
+                expression {
                     return env.BRANCH_NAME != 'develop' && env.BRANCH_NAME != 'main'
                 }
             }
             steps {
-                withEnv(["GITHUB_TOKEN=${GITHUB_TOKEN}"]) {
+                withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
                     sh """
+                        echo "$GITHUB_TOKEN" | gh auth login --with-token
                         echo "🔀 Creating PR from ${env.BRANCH_NAME} → develop"
                         gh pr create \
                           --repo ${REPO} \
@@ -44,8 +44,9 @@ pipeline {
                 branch 'develop'
             }
             steps {
-                withEnv(["GITHUB_TOKEN=${GITHUB_TOKEN}"]) {
+                withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
                     sh """
+                        echo "$GITHUB_TOKEN" | gh auth login --with-token
                         echo "✅ Merging develop → main"
                         gh pr create \
                           --repo ${REPO} \
@@ -80,3 +81,4 @@ pipeline {
         }
     }
 }
+ 
