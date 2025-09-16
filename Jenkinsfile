@@ -23,7 +23,12 @@ pipeline {
                           --base develop \
                           --head ${BRANCH_NAME} \
                           --title "Auto PR: ${BRANCH_NAME} → develop" \
-                          --body "This PR was auto-created by Jenkins." || true)
+                          --body "This PR was auto-created by Jenkins." 2>/dev/null || true)
+
+                        # Fallback if PR already exists
+                        if [ -z "$PR_URL" ]; then
+                          PR_URL=$(gh pr view ${BRANCH_NAME} --repo ${REPO} --json url -q .url || true)
+                        fi
 
                         echo "✅ Merging ${BRANCH_NAME} → develop"
                         gh pr merge "$PR_URL" \
@@ -58,7 +63,12 @@ pipeline {
                           --base main \
                           --head develop \
                           --title "Auto PR: develop → main" \
-                          --body "This PR was auto-created by Jenkins after approval." || true)
+                          --body "This PR was auto-created by Jenkins after approval." 2>/dev/null || true)
+
+                        # Fallback if PR already exists
+                        if [ -z "$PR_URL" ]; then
+                          PR_URL=$(gh pr view develop --repo ${REPO} --json url -q .url || true)
+                        fi
 
                         echo "✅ Merging develop → main"
                         gh pr merge "$PR_URL" \
