@@ -18,15 +18,15 @@ pipeline {
                 withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
                     sh '''
                         echo "🔀 Creating PR from ${BRANCH_NAME} → develop"
-                        gh pr create \
+                        PR_URL=$(gh pr create \
                           --repo ${REPO} \
                           --base develop \
                           --head ${BRANCH_NAME} \
                           --title "Auto PR: ${BRANCH_NAME} → develop" \
-                          --body "This PR was auto-created by Jenkins." || true
+                          --body "This PR was auto-created by Jenkins." || true)
 
                         echo "✅ Merging ${BRANCH_NAME} → develop"
-                        gh pr merge \
+                        gh pr merge "$PR_URL" \
                           --repo ${REPO} \
                           --merge \
                           --auto \
@@ -53,15 +53,15 @@ pipeline {
                 withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
                     sh '''
                         echo "🔀 Creating PR from develop → main"
-                        gh pr create \
+                        PR_URL=$(gh pr create \
                           --repo ${REPO} \
                           --base main \
                           --head develop \
                           --title "Auto PR: develop → main" \
-                          --body "This PR was auto-created by Jenkins after approval." || true
+                          --body "This PR was auto-created by Jenkins after approval." || true)
 
                         echo "✅ Merging develop → main"
-                        gh pr merge \
+                        gh pr merge "$PR_URL" \
                           --repo ${REPO} \
                           --merge \
                           --auto \
@@ -87,3 +87,4 @@ pipeline {
         }
     }
 }
+ 
