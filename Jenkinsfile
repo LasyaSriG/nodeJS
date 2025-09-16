@@ -3,6 +3,9 @@ pipeline {
 
     environment {
         EMAIL_RECIPIENTS = 'lasyasrilasya14@gmail.com'
+        GITHUB_TOKEN = credentials('github-token')   // Jenkins Credential ID for GitHub PAT
+        REPO = 'https://github.com/LasyaSriG/nodeJS'                  // Replace with your GitHub repo (user/org + repo)
+        BASE_BRANCH = 'develop'
     }
 
     stages {
@@ -65,13 +68,32 @@ Jenkins
             }
         }
 
+        stage('Create Pull Request') {
+            when {
+                expression { currentBuild.resultIsBetterOrEqualTo('SUCCESS') && env.BRANCH_NAME != 'develop' && env.BRANCH_NAME != 'main' }
+            }
+            steps {
+                withEnv(["GITHUB_TOKEN=${GITHUB_TOKEN}"]) {
+                    sh """
+                        echo "🔀 Creating PR from ${env.BRANCH_NAME} → ${BASE_BRANCH}"
+                        gh pr create \
+                          --repo ${REPO} \
+                          --base ${BASE_BRANCH} \
+                          --head ${env.BRANCH_NAME} \
+                          --title "Auto PR: ${env.BRANCH_NAME} → ${BASE_BRANCH}" \
+                          --body "This PR was automatically created by Jenkins after successful build & tests."
+                    """
+                }
+            }
+        }
+
         stage('Ready for Merge') {
             when {
                 expression { currentBuild.resultIsBetterOrEqualTo('SUCCESS') }
             }
             steps {
                 echo "Build & tests passed for branch '${env.BRANCH_NAME}'."
-                echo "Proceed with PR: feature → develop → master (with approvals)."
+                echo "PR created from feature → develop. Next step: merge develop → master with approvals."
             }
         }
     }
@@ -91,7 +113,7 @@ The pipeline for branch '${env.BRANCH_NAME}' finished successfully.
 Build: #${env.BUILD_NUMBER}
 Logs: ${env.BUILD_URL}
 
-You can now proceed with the Pull Request.
+A Pull Request has been automatically created.
 
 Regards,
 Jenkins
