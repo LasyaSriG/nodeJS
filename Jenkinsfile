@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        EMAIL_RECIPIENTS = 'dev-team@example.com'
+        EMAIL_RECIPIENTS = 'lasyasrilasya14@gmail.com'
     }
 
     stages {
@@ -18,21 +18,21 @@ pipeline {
             }
             post {
                 failure {
-                    mail to: "${EMAIL_RECIPIENTS}",
-                         subject: "BUILD FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                         body: """Hello Team,
+                    script {
+                        mail to: "${EMAIL_RECIPIENTS}",
+                             subject: "BUILD FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                             body: """
+Hello Team,
 
-The pipeline failed during the *dependency installation* stage.
+The pipeline failed during *dependency installation*.
 Branch: ${env.BRANCH_NAME}
 Build: #${env.BUILD_NUMBER}
 Logs: ${env.BUILD_URL}
 
-Please check and fix the issue.
-
 Regards,
 Jenkins
 """
-                    currentBuild.result = 'FAILURE'
+                    }
                 }
             }
         }
@@ -43,37 +43,35 @@ Jenkins
             }
             post {
                 failure {
-                    mail to: "${EMAIL_RECIPIENTS}",
-                         subject: "BUILD FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                         body: """Hello Team,
+                    script {
+                        mail to: "${EMAIL_RECIPIENTS}",
+                             subject: "BUILD FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                             body: """
+Hello Team,
 
-The pipeline failed during the *test execution* stage.
+The pipeline failed during *tests*.
 Branch: ${env.BRANCH_NAME}
 Build: #${env.BUILD_NUMBER}
 Logs: ${env.BUILD_URL}
 
-Please review the test results.
-
 Regards,
 Jenkins
 """
-                    currentBuild.result = 'FAILURE'
+                    }
                 }
                 success {
-                    echo "Tests passed successfully."
+                    echo "✅ Tests passed successfully."
                 }
             }
         }
 
         stage('Ready for Merge') {
             when {
-                expression { currentBuild.result != 'FAILURE' }
+                expression { currentBuild.resultIsBetterOrEqualTo('SUCCESS') }
             }
             steps {
-                script {
-                    echo "Build & tests passed for branch '${env.BRANCH_NAME}'."
-                    echo "Proceed with Pull Request: feature → develop → master (with approvals)."
-                }
+                echo "Build & tests passed for branch '${env.BRANCH_NAME}'."
+                echo "Proceed with PR: feature → develop → master (with approvals)."
             }
         }
     }
@@ -83,36 +81,40 @@ Jenkins
             cleanWs()
         }
         success {
-            mail to: "${EMAIL_RECIPIENTS}",
-                 subject: "BUILD SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                 body: """Hello Team,
+            script {
+                mail to: "${EMAIL_RECIPIENTS}",
+                     subject: "BUILD SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                     body: """
+Hello Team,
 
 The pipeline for branch '${env.BRANCH_NAME}' finished successfully.
 Build: #${env.BUILD_NUMBER}
 Logs: ${env.BUILD_URL}
 
-You can now proceed with the Pull Request to 'develop'.
-Once approved and merged, changes can be promoted to 'master'.
+You can now proceed with the Pull Request.
 
 Regards,
 Jenkins
 """
+            }
         }
         failure {
-            // Extra safeguard email in case failure wasn’t already sent
-            mail to: "${EMAIL_RECIPIENTS}",
-                 subject: "BUILD FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                 body: """Hello Team,
+            script {
+                mail to: "${EMAIL_RECIPIENTS}",
+                     subject: "BUILD FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                     body: """
+Hello Team,
 
 The pipeline for branch '${env.BRANCH_NAME}' failed.
 Build: #${env.BUILD_NUMBER}
 Logs: ${env.BUILD_URL}
 
-Please investigate the issue.
+Please check the issue.
 
 Regards,
 Jenkins
 """
+            }
         }
     }
 }
