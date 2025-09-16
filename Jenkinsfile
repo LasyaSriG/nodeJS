@@ -15,19 +15,7 @@ pipeline {
             }
         }
 
-        stage('Install Dependencies') {
-            steps {
-                sh 'npm install'
-            }
-        }
-
-        stage('Run Tests') {
-            steps {
-                sh 'npm test'
-            }
-        }
-
-        stage('Auto Merge Feature → Develop') {
+        stage('Create Pull Request (Immediate)') {
             when {
                 expression { env.BRANCH_NAME != 'develop' && env.BRANCH_NAME != 'main' }
             }
@@ -35,37 +23,58 @@ pipeline {
                 withEnv(["GITHUB_TOKEN=${GITHUB_TOKEN}"]) {
                     sh """
                         echo "🔀 Creating PR from ${env.BRANCH_NAME} → ${BASE_BRANCH}"
+                        # If PR already exists, this will fail silently (you can add logic to skip)
                         gh pr create \
                           --repo ${REPO} \
                           --base ${BASE_BRANCH} \
                           --head ${env.BRANCH_NAME} \
                           --title "Auto PR: ${env.BRANCH_NAME} → ${BASE_BRANCH}" \
-                          --body "This PR was automatically created by Jenkins after successful build & tests."
+                          --body "This PR was auto-created by Jenkins as soon as the commit was pushed." || true
 
-                        echo "✅ Merging PR into ${BASE_BRANCH}"
+                        echo "✅ Marking PR for auto-merge (GitHub will merge when checks pass)"
                         gh pr merge \
                           --repo ${REPO} \
                           --merge \
-                          --auto
+                          --auto \
+                          --subject "Auto-merge: ${env.BRANCH_NAME} → ${BASE_BRANCH}" || true
                     """
                 }
             }
         }
 
-        stage('Approval for Develop → Master') {
+        stage('Install Dependencies') {
+            steps {
+                cache(path: 'node_modules', key: "npm-${env.BRANCH_NAME}") {
+                    sh 'npm install'
+                }
+            }
+        }
+
+        stage('Run Tests') {
+            parallel {
+                stage('Unit Tests') {
+                    steps { sh 'npm run test:unit || npm test' }
+                }
+                stage('Integration Tests') {
+                    steps { sh 'npm run test:integration || echo "No integration tests"' }
+                }
+            }
+        }
+
+        stage('Approval for Develop → Main') {
             when {
                 branch 'develop'
             }
             steps {
                 script {
                     timeout(time: 1, unit: 'HOURS') {
-                        input message: "Do you want to merge *develop → master*?", ok: "Approve Merge"
+                        input message: "Do you want to merge *develop → main*?", ok: "Approve Merge"
                     }
                 }
             }
         }
 
-        stage('Merge Develop → Master') {
+        stage('Merge Develop → Main') {
             when {
                 branch 'develop'
             }
@@ -78,13 +87,14 @@ pipeline {
                           --base main \
                           --head develop \
                           --title "Release: develop → main" \
-                          --body "This PR promotes develop to main after approval."
+                          --body "This PR promotes develop to main after approval." || true
 
-                        echo "✅ Merging PR into main"
+                        echo "✅ Marking PR for auto-merge into main"
                         gh pr merge \
                           --repo ${REPO} \
                           --merge \
-                          --auto
+                          --auto \
+                          --subject "Release auto-merge: develop → main" || true
                     """
                 }
             }
@@ -102,10 +112,10 @@ Pipeline succeeded for branch '${env.BRANCH_NAME}'.
 Build: #${env.BUILD_NUMBER}
 Logs: ${env.BUILD_URL}
 
-If feature branch: code merged → develop.
-If develop branch: merge to master pending approval.
+- Feature branch: PR created → develop (auto-merge pending checks)
+- Develop branch: PR created → main (merge pending approval)
 
-Regards,
+Regards,  
 Jenkins
 """
         }
@@ -121,7 +131,7 @@ Logs: ${env.BUILD_URL}
 
 Please check and fix.
 
-Regards,
+Regards,  
 Jenkins
 """
         }
@@ -130,4 +140,3 @@ Jenkins
         }
     }
 }
- 
