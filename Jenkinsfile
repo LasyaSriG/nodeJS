@@ -17,6 +17,10 @@ pipeline {
             steps {
                 withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
                     sh '''
+                        echo "🔀 Checking out branch ${BRANCH_NAME}"
+                        git fetch origin ${BRANCH_NAME}:${BRANCH_NAME}
+                        git checkout ${BRANCH_NAME}
+
                         echo "🔀 Creating PR from ${BRANCH_NAME} → develop"
                         PR_URL=$(gh pr create \
                           --repo ${REPO} \
@@ -57,6 +61,10 @@ pipeline {
             steps {
                 withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
                     sh '''
+                        echo "🔀 Checking out develop branch"
+                        git fetch origin develop:develop
+                        git checkout develop
+
                         echo "🔀 Creating PR from develop → main"
                         PR_URL=$(gh pr create \
                           --repo ${REPO} \
@@ -97,4 +105,3 @@ pipeline {
         }
     }
 }
- 
