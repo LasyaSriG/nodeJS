@@ -3,7 +3,7 @@ const app = express();
 
 // Root endpoint
 app.get('/', (req, res) => {
-  res.send('Hello from Feature Branch!');
+  res.send('Hi from Feature Branch!');
 });
 
 // Another sample endpoint
