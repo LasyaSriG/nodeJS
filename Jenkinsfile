@@ -2,11 +2,45 @@ pipeline {
     agent any
 
     environment {
-        REPO        = "https://github.com/LasyaSriG/nodeJS" // Your repo
+        REPO        = "https://github.com/LasyaSriG/nodeJS"   // Your repo
         BASE_BRANCH = "develop"
+        NOTIFY_EMAIL = "lasyasrilasya14@gmail.com"            // Change to your email or a group DL
     }
 
     stages {
+
+        stage('Checkout & Install') {
+            steps {
+                checkout scm
+                sh '''
+                    echo "📦 Installing dependencies"
+                    npm install
+                '''
+            }
+        }
+
+        stage('Run Node.js Tests') {
+            steps {
+                script {
+                    try {
+                        sh 'npm test'
+                    } catch (err) {
+                        mail to: "${env.NOTIFY_EMAIL}",
+                             subject: "❌ Jenkins: Node.js Test Failure in ${env.BRANCH_NAME}",
+                             body: """\
+Hi,
+
+Your code in branch ${env.BRANCH_NAME} failed Node.js test cases.
+Please check the Jenkins console output for details.
+
+Thanks,  
+Jenkins
+"""
+                        error("❌ Node.js tests failed. Aborting pipeline.")
+                    }
+                }
+            }
+        }
 
         stage('PR + Merge: Feature → Develop') {
             when {
@@ -17,29 +51,31 @@ pipeline {
             steps {
                 withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
                     sh '''
-                        echo "🔀 Checking out branch ${BRANCH_NAME}"
-                        git fetch origin ${BRANCH_NAME}:${BRANCH_NAME}
-                        git checkout ${BRANCH_NAME}
+                        # Detect correct source branch (CHANGE_BRANCH for PR jobs, BRANCH_NAME otherwise)
+                        SRC_BRANCH="${CHANGE_BRANCH:-$BRANCH_NAME}"
 
-                        echo "🔀 Creating PR from ${BRANCH_NAME} → develop"
+                        echo "🔀 Checking out branch $SRC_BRANCH"
+                        git fetch origin $SRC_BRANCH:$SRC_BRANCH
+                        git checkout $SRC_BRANCH
+
+                        echo "🔀 Creating PR from $SRC_BRANCH → develop"
                         PR_URL=$(gh pr create \
                           --repo ${REPO} \
                           --base develop \
-                          --head ${BRANCH_NAME} \
-                          --title "Auto PR: ${BRANCH_NAME} → develop" \
+                          --head $SRC_BRANCH \
+                          --title "Auto PR: $SRC_BRANCH → develop" \
                           --body "This PR was auto-created by Jenkins." 2>/dev/null || true)
 
-                        # Fallback if PR already exists
                         if [ -z "$PR_URL" ]; then
-                          PR_URL=$(gh pr view ${BRANCH_NAME} --repo ${REPO} --json url -q .url || true)
+                          PR_URL=$(gh pr view $SRC_BRANCH --repo ${REPO} --json url -q .url || true)
                         fi
 
-                        echo "✅ Merging ${BRANCH_NAME} → develop"
+                        echo "✅ Merging $SRC_BRANCH → develop"
                         gh pr merge "$PR_URL" \
                           --repo ${REPO} \
                           --merge \
                           --auto \
-                          --subject "Auto-merge: ${BRANCH_NAME} → develop" || true
+                          --subject "Auto-merge: $SRC_BRANCH → develop" || true
                     '''
                 }
             }
@@ -61,29 +97,30 @@ pipeline {
             steps {
                 withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
                     sh '''
-                        echo "🔀 Checking out develop branch"
-                        git fetch origin develop:develop
-                        git checkout develop
+                        SRC_BRANCH="develop"
 
-                        echo "🔀 Creating PR from develop → main"
+                        echo "🔀 Checking out $SRC_BRANCH"
+                        git fetch origin $SRC_BRANCH:$SRC_BRANCH
+                        git checkout $SRC_BRANCH
+
+                        echo "🔀 Creating PR from $SRC_BRANCH → main"
                         PR_URL=$(gh pr create \
                           --repo ${REPO} \
                           --base main \
-                          --head develop \
-                          --title "Auto PR: develop → main" \
+                          --head $SRC_BRANCH \
+                          --title "Auto PR: $SRC_BRANCH → main" \
                           --body "This PR was auto-created by Jenkins after approval." 2>/dev/null || true)
 
-                        # Fallback if PR already exists
                         if [ -z "$PR_URL" ]; then
-                          PR_URL=$(gh pr view develop --repo ${REPO} --json url -q .url || true)
+                          PR_URL=$(gh pr view $SRC_BRANCH --repo ${REPO} --json url -q .url || true)
                         fi
 
-                        echo "✅ Merging develop → main"
+                        echo "✅ Merging $SRC_BRANCH → main"
                         gh pr merge "$PR_URL" \
                           --repo ${REPO} \
                           --merge \
                           --auto \
-                          --subject "Auto-merge: develop → main" || true
+                          --subject "Auto-merge: $SRC_BRANCH → main" || true
                     '''
                 }
             }
